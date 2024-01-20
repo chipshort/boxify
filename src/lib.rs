@@ -255,6 +255,9 @@ mod tests {
     use super::*;
 
     /// Size that is too big to allocate on the stack
+    #[cfg(miri)]
+    const SIZE: usize = 10;
+    #[cfg(not(miri))]
     const SIZE: usize = 10000000;
 
     #[test]
