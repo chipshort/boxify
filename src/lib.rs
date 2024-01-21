@@ -108,7 +108,7 @@ macro_rules! boxify {
     };
     // Struct { ... }
     ($ty:ident { $($fields:tt)* }) => {{
-        let mut v = $crate::new_box_uninit::<$ty>();
+        let mut v = $crate::new_box_uninit_typed(|| $ty { $($fields)* });
         let ptr = v.as_mut_ptr();
 
         #[allow(unused_unsafe)]
@@ -153,6 +153,15 @@ macro_rules! init_fields {
     };
     // no more fields
     ($ptr: expr,) => {};
+}
+
+/// Allocates a new box of the given type, leaving the memory uninitialized.
+/// This version takes a closure to avoid having to specify the type. The closure itself is not called.
+///
+/// This can be replaced with `Box::new_uninit` once it is stable.
+#[doc(hidden)]
+pub fn new_box_uninit_typed<T>(_: impl FnOnce() -> T) -> Box<MaybeUninit<T>> {
+    new_box_uninit::<T>()
 }
 
 /// Allocates a new box of the given type, leaving the memory uninitialized.
@@ -387,8 +396,8 @@ mod tests {
 
     #[test]
     fn boxify_complex_struct() {
-        struct A<'a> {
-            a: &'a [u32; 100],
+        struct A<'a, T> {
+            a: &'a [T; 100],
             b: &'a str,
         }
 
