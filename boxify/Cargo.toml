@@ -1,0 +1,8 @@
+[package]
+name = "boxify"
+version = "0.1.0"
+edition = "2021"
+authors = ["Christoph Otter <chipshort@protonmail.com>"]
+
+[dependencies]
+boxify-macro = { path = "../boxify-macro" }

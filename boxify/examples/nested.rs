@@ -24,6 +24,9 @@ fn main() {
         },
     });
 
-    value.as_mut().child.value = 21;
-    println!("value.child.value = {}", value.child.value);
+    value.as_mut().child.grand_child.huge_array[100] = 21;
+    println!(
+        "value.child.grand_child.huge_array[100] = {}",
+        value.child.grand_child.huge_array[100]
+    );
 }

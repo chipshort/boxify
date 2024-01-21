@@ -12,7 +12,7 @@ use core::{
     ptr::NonNull,
 };
 
-mod compile_tests;
+pub use boxify_macro::boxify;
 
 /// Type-checks its argument to be a pointer to some type.
 #[doc(hidden)]
@@ -184,68 +184,68 @@ macro_rules! fill_ptr {
     }};
 }
 
-#[macro_export]
-macro_rules! boxify {
-    // [0; COUNT]
-    ([0; $n:expr]) => {
-        // Rust uses i32 for untyped integer literals
-        unsafe { $crate::new_box_zeroed::<[i32; $n]>() }
-    };
-    ([0u16; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[u16; $n]>() }
-    };
-    ([0u32; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[u32; $n]>() }
-    };
-    ([0u64; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[u64; $n]>() }
-    };
-    ([0u128; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[u128; $n]>() }
-    };
-    ([0usize; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[usize; $n]>() }
-    };
-    ([0i16; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[i16; $n]>() }
-    };
-    ([0i32; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[i32; $n]>() }
-    };
-    ([0i64; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[i64; $n]>() }
-    };
-    ([0i128; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[i128; $n]>() }
-    };
-    ([0isize; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[isize; $n]>() }
-    };
-    ([0f32; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[f32; $n]>() }
-    };
-    ([0f64; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[f64; $n]>() }
-    };
-    ([false; $n:expr]) => {
-        unsafe { $crate::new_box_zeroed::<[bool; $n]>() }
-    };
-    // [value; COUNT] where TypeOf[value]: Copy
-    ([$value:expr; $n:expr]) => {
-        $crate::new_filled_boxed_array::<_, $n>($value)
-    };
-    // Struct { ... }
-    ($ty:ident { $($fields:tt)* }) => {{
-        let mut boxify_final_value = $crate::new_box_uninit_typed($crate::clone_type!($ty { $($fields)* }));
-        let boxify_final_value_ptr = boxify_final_value.as_mut_ptr();
+// #[macro_export]
+// macro_rules! boxify {
+//     // [0; COUNT]
+//     ([0; $n:expr]) => {
+//         // Rust uses i32 for untyped integer literals
+//         unsafe { $crate::new_box_zeroed::<[i32; $n]>() }
+//     };
+//     ([0u16; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[u16; $n]>() }
+//     };
+//     ([0u32; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[u32; $n]>() }
+//     };
+//     ([0u64; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[u64; $n]>() }
+//     };
+//     ([0u128; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[u128; $n]>() }
+//     };
+//     ([0usize; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[usize; $n]>() }
+//     };
+//     ([0i16; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[i16; $n]>() }
+//     };
+//     ([0i32; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[i32; $n]>() }
+//     };
+//     ([0i64; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[i64; $n]>() }
+//     };
+//     ([0i128; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[i128; $n]>() }
+//     };
+//     ([0isize; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[isize; $n]>() }
+//     };
+//     ([0f32; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[f32; $n]>() }
+//     };
+//     ([0f64; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[f64; $n]>() }
+//     };
+//     ([false; $n:expr]) => {
+//         unsafe { $crate::new_box_zeroed::<[bool; $n]>() }
+//     };
+//     // [value; COUNT] where TypeOf[value]: Copy
+//     ([$value:expr; $n:expr]) => {
+//         $crate::new_filled_boxed_array::<_, $n>($value)
+//     };
+//     // Struct { ... }
+//     ($ty:ident { $($fields:tt)* }) => {{
+//         let mut boxify_final_value = $crate::new_box_uninit_typed($crate::clone_type!($ty { $($fields)* }));
+//         let boxify_final_value_ptr = boxify_final_value.as_mut_ptr();
 
-        #[allow(unused_unsafe)]
-        unsafe { $crate::fill_ptr!(boxify_final_value_ptr, $ty { $($fields)* }) };
+//         #[allow(unused_unsafe)]
+//         unsafe { $crate::fill_ptr!(boxify_final_value_ptr, $ty { $($fields)* }) };
 
-        // SAFETY: we just initialized the struct
-        unsafe { $crate::assume_init(boxify_final_value) }
-    }};
-}
+//         // SAFETY: we just initialized the struct
+//         unsafe { $crate::assume_init(boxify_final_value) }
+//     }};
+// }
 
 #[macro_export]
 macro_rules! init_fields {
@@ -310,6 +310,12 @@ macro_rules! init_fields {
 #[doc(hidden)]
 pub fn new_box_uninit_typed<T>(_: TypeInferer<T>) -> Box<MaybeUninit<T>> {
     new_box_uninit::<T>()
+}
+
+/// See [`new_box_zeroed`] and [`new_box_uninit_typed`].
+#[doc(hidden)]
+pub unsafe fn new_box_zeroed_typed<T>(_: TypeInferer<T>) -> Box<T> {
+    new_box_zeroed()
 }
 
 /// Allocates a new box of the given type, leaving the memory uninitialized.
@@ -399,190 +405,7 @@ pub unsafe fn fill_array<T: Copy, const SIZE: usize>(array: *mut [T; SIZE], valu
 #[doc(hidden)]
 pub unsafe fn assume_init<T>(b: Box<MaybeUninit<T>>) -> Box<T> {
     // SAFETY: MaybeUninit<T> guarantees the same layout as T
+    // FIXME: but it does not guarantee the same layout for
+    // Box<MaybeUninit<T>> and Box<T>
     transmute(b)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Size that is too big to allocate on the stack
-    #[cfg(miri)]
-    const SIZE: usize = 10;
-    #[cfg(not(miri))]
-    const SIZE: usize = 10000000;
-
-    #[test]
-    #[ignore = "causes stack overflow"]
-    fn size_too_big_for_stack() {
-        let b = Box::new([0u8; SIZE]);
-        assert_eq!(b[SIZE - 1], 0);
-    }
-
-    #[test]
-    fn new_box_uninit_not_on_stack() {
-        new_box_uninit::<[u8; SIZE]>();
-    }
-
-    #[test]
-    fn boxify_zeroed_array() {
-        // this should not:
-        let b = boxify!([0; SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], 0);
-        }
-        let b = boxify!([0i128; SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], 0);
-        }
-        let b = boxify!([0u64; SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], 0);
-        }
-        let b = boxify!([0f64; SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], 0.0);
-        }
-    }
-
-    #[test]
-    fn boxify_single_byte_array() {
-        // bool
-        let b = boxify!([false; SIZE]);
-        for i in 0..SIZE {
-            assert!(!b[i]);
-        }
-        let b = boxify!([true; SIZE]);
-        for i in 0..SIZE {
-            assert!(b[i]);
-        }
-        // u8
-        let b = boxify!([42u8; SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], 42);
-        }
-        // single byte struct
-        #[repr(transparent)]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        struct Foo(u8);
-        let b = boxify!([Foo(42); SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], Foo(42));
-        }
-    }
-
-    #[test]
-    fn boxify_multi_byte_array() {
-        let b = boxify!([4200; SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], 4200);
-        }
-        let b = boxify!([i128::MAX / 42; SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], i128::MAX / 42);
-        }
-        // multi byte struct
-        #[repr(transparent)]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        struct Foo(u64);
-        let b = boxify!([Foo(0x8888888888); SIZE]);
-        for i in 0..SIZE {
-            assert_eq!(b[i], Foo(0x8888888888));
-        }
-    }
-
-    #[test]
-    fn boxify_zst_array() {
-        // just making sure these don't cause problems
-        let b = boxify!([(); SIZE]);
-        assert_eq!(b.len(), SIZE);
-
-        let b = boxify!([(); 0]);
-        assert_eq!(b.len(), 0);
-
-        let b = boxify!([12u8; 0]);
-        assert_eq!(b.len(), 0);
-    }
-
-    #[test]
-    fn boxify_struct() {
-        #[derive(Debug, Clone, Copy, PartialEq)]
-        struct Foo {
-            a: u32,
-            b: u32,
-        }
-        let b = boxify!(Foo { a: 1, b: 2 });
-        assert_eq!(b.a, 1);
-        assert_eq!(b.b, 2);
-
-        #[derive(Debug, PartialEq)]
-        struct Bar {
-            a: [u32; SIZE],
-            b: [Foo; SIZE],
-        }
-        let b = boxify!(Bar {
-            a: [0; SIZE],
-            b: [Foo { a: 1, b: 2 }; SIZE],
-        });
-        assert_eq!(b.a[SIZE - 1], 0);
-        assert_eq!(b.b[SIZE - 1], Foo { a: 1, b: 2 });
-
-        struct Nested {
-            a: Bar,
-            b: [u32; SIZE],
-        }
-        let b = boxify!(Nested {
-            a: Bar {
-                a: [0; SIZE],
-                b: [Foo { a: 1, b: 2 }; SIZE],
-            },
-            b: [0; SIZE],
-        });
-        assert_eq!(b.a.a[SIZE - 1], 0);
-        assert_eq!(b.a.b[SIZE - 1], Foo { a: 1, b: 2 });
-    }
-
-    // #[test]
-    // fn boxify_tuple() {
-    //     // actual tuple
-    //     let b = boxify!((1, 2));
-    //     assert_eq!(b.0, 1);
-    //     assert_eq!(b.1, 2);
-
-    //     // tuple struct
-    //     let b = boxify!(Some(1));
-    //     assert_eq!(b, Some(1));
-    // }
-
-    #[test]
-    fn boxify_complex_struct() {
-        struct A<'a, T> {
-            a: &'a [T; 100],
-            b: &'a str,
-            c: [T; 10],
-        }
-
-        let a = &[42; 100];
-        let b = "hello world";
-        let bx = boxify!(A {
-            a: a,
-            b: b,
-            c: [21; 10]
-        }); // TODO: support short form `A { a, b }`
-        assert_eq!(bx.a, a);
-        assert_eq!(bx.b, b);
-    }
-
-    #[test]
-    fn boxify_local_variable() {
-        let a = alloc::vec![42; 100];
-        // let b = boxify!(a);
-        // assert_eq!(*b, 42);
-
-        struct Test {
-            a: alloc::vec::Vec<u32>,
-        }
-
-        boxify!(Test { a: a });
-    }
 }

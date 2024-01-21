@@ -10,4 +10,12 @@
 /// boxify!(Foo {})
 /// ```
 #[allow(dead_code)]
-fn missing_struct_field() {}
+pub fn missing_struct_field() {}
+
+/// ```compile_fail
+/// use boxify::boxify;
+///
+/// let a = vec![42; 100];
+/// let b = boxify!(a);
+/// ```
+pub fn incorrect_usage() {}
