@@ -147,17 +147,19 @@ fn boxify_struct() {
     assert_eq!(b.a.b[SIZE - 1], Foo { a: 1, b: 2 });
 }
 
-// #[test]
-// fn boxify_tuple() {
-//     // actual tuple
-//     let b = boxify!((1, 2));
-//     assert_eq!(b.0, 1);
-//     assert_eq!(b.1, 2);
+#[test]
+fn boxify_tuple() {
+    // actual tuple
+    let b = boxify!(([0u64; SIZE], 2));
+    assert_eq!(b.0[0], 0);
+    assert_eq!(b.1, 2);
 
-//     // tuple struct
-//     let b = boxify!(Some(1));
-//     assert_eq!(b, Some(1));
-// }
+    // tuple struct
+    struct TupleStruct([u64; SIZE], u32);
+    let b = boxify!(TupleStruct([0u64; SIZE], 2));
+    assert_eq!(b.0[0], 0);
+    assert_eq!(b.1, 2);
+}
 
 #[test]
 fn boxify_complex_struct() {

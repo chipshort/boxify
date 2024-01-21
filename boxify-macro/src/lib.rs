@@ -18,8 +18,8 @@ extern crate proc_macro;
 ///
 /// # Examples
 ///
-/// ```rust,do_not_run
-/// use boxify_macro::boxify;
+/// ```rust,ignore
+/// use boxify::boxify;
 ///
 /// let b = boxify!([42u32; 1024 * 1024 * 1024]);
 /// assert_eq!(b[0], 42);
@@ -42,8 +42,11 @@ fn boxify_impl(value_to_box: Expr) -> TokenStream {
         __boxify_final_value_ptr
     };
     let instantiation_code = match value_to_box {
-        Expr::Struct(strct) => fill_struct_fields(&final_value_ptr, &strct),
-        Expr::Repeat(array) => fill_array(&final_value_ptr, &array),
+        // listing them here explicitly in order to throw an error for any other type
+        // since only these here are allocated directly on the heap right now
+        Expr::Struct(_) | Expr::Repeat(_) | Expr::Tuple(_) | Expr::Call(_) => {
+            fill_ptr(&final_value_ptr, &value_to_box)
+        }
         _ => todo!("Implement for more types"),
     };
 
@@ -131,6 +134,15 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
         }
         Expr::Repeat(array) => fill_array(ptr, array),
         Expr::Struct(strct) => fill_struct_fields(ptr, strct),
+        Expr::Tuple(tuple) => fill_tuple(ptr, &tuple.elems),
+        Expr::Call(call) => {
+            if let Expr::Path(_) = &*call.func {
+                // TODO: we assume that we are given a struct for now
+                fill_tuple(ptr, &call.args)
+            } else {
+                unimplemented!("function calls are not supported")
+            }
+        }
         e => {
             // fallback to creating the value on the stack and writing it to
             // the pointer from there
@@ -143,9 +155,7 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
 
 /// Fills a struct by filling all its fields.
 fn fill_struct_fields(strct_ptr: &Expr, strct: &syn::ExprStruct) -> proc_macro2::TokenStream {
-    let fields = &strct.fields;
-
-    let instantiation_codes = fields.iter().map(|field| {
+    let instantiation_codes = strct.fields.iter().map(|field| {
         let ident = &field.member;
         let expr = &field.expr;
 
@@ -164,6 +174,23 @@ fn fill_array(ptr: &Expr, array: &syn::ExprRepeat) -> proc_macro2::TokenStream {
     quote! {
         // SAFETY: We only call this on uninitialized memory
         unsafe { ::boxify::fill_array(#ptr, #value); }
+    }
+}
+
+/// Fills a tuple by filling all its elements.
+fn fill_tuple(
+    ptr: &Expr,
+    elems: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
+) -> proc_macro2::TokenStream {
+    let instantiation_codes = elems.iter().enumerate().map(|(index, value)| {
+        let index = syn::Index::from(index);
+        let field_ptr = parse_quote! {
+            core::ptr::addr_of_mut!((*#ptr).#index)
+        };
+        fill_ptr(&field_ptr, &value)
+    });
+    quote! {
+        #(#instantiation_codes);*
     }
 }
 
