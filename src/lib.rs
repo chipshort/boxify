@@ -7,14 +7,144 @@ use alloc::{
 };
 use core::{
     alloc::Layout,
+    marker::PhantomData,
     mem::{size_of, transmute, MaybeUninit},
     ptr::NonNull,
 };
+
+mod compile_tests;
 
 /// Type-checks its argument to be a pointer to some type.
 #[doc(hidden)]
 #[inline(always)]
 pub fn typecheck<T>(_: *mut T) {}
+
+/// Never use this in code that is actually run!
+/// This is only here to make sure that the macro works.
+/// It creates a second owned value from a reference.
+///
+/// # Safety
+/// This is NEVER safe to use.
+#[doc(hidden)]
+pub unsafe fn clone<T>(t: &T) -> T {
+    let mut dest = MaybeUninit::uninit();
+    core::ptr::from_ref(t).copy_to(dest.as_mut_ptr(), 1);
+    dest.assume_init()
+}
+
+/// A type that can be used as a parameter to infer the type of a value.
+/// It can be created from a closure that returns a value of the desired type.
+///
+/// It allows you to make sure that you have a valid value of `T` or using a
+/// value of type `T` to infer the type parameter of a function.
+pub struct TypeInferer<T>(PhantomData<T>);
+
+impl<T> TypeInferer<T> {
+    /// Creates a new `TypeInferer` from a closure that returns a value of type `T`.
+    /// The closure is never called. It's only purpose is to infer the type of `T`.
+    pub fn new(_: impl FnOnce() -> T) -> Self {
+        Self(PhantomData)
+    }
+}
+
+/// Helper macro that makes sure that all fields of a struct are being set
+/// and returns a `TypeInferer<T>` where `T` is the type of the input value.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! clone_type {
+    (
+        // match struct instantiation
+        $ty:ident {
+            $($field:ident : $value:expr),* $(,)?
+        }
+    ) => {
+        // This is never called, but causes a compiler error if
+        // not all fields are mentioned
+        #[allow(unused)] {
+            $crate::TypeInferer::new(|| {
+                    $crate::clone_struct!(
+                        $ty { }
+                        $($field : $value),*
+                    )
+            })
+        }
+    };
+}
+
+/// Takes an accumulator and a list of fields, cloning each of them (recursively if necessary)
+/// by calling [`crate::clone`].
+#[doc(hidden)]
+#[macro_export]
+macro_rules! clone_struct {
+    // struct instantiation as a field value
+    (
+        // accumulator for the cloned fields; gets filled over time
+        $clone:ident {
+            $($clone_fields:tt)*
+        }
+        // field: Struct { ... }
+        $field:ident : $ty:ident {
+            $($fields:tt)*
+        },
+        $($rest:tt)*
+    ) => {
+        $crate::clone_struct!(
+            $clone {
+                // keep everything we already cloned
+                $($clone_fields)*
+                // clone the new field
+                $field : $crate::clone_struct!($ty {}, $ty { $($fields)* }),
+            }
+            // continue with the rest
+            $($rest)*
+        )
+    };
+    // any expression as field value
+    (
+        // accumulator for the cloned fields; gets filled over time
+        $clone:ident {
+            $($clone_fields:tt)*
+        }
+        // field: value
+        $field:ident : $value:expr,
+        $($rest:tt)*
+    ) => {
+        $crate::clone_struct!(
+            $clone {
+                // keep everything we already cloned
+                $($clone_fields)*
+                // clone the new field
+                // SAFETY: this will never be called
+                $field : unsafe { $crate::clone(&$value) },
+            }
+            // continue with the rest
+            $($rest)*
+        )
+    };
+    // single field
+    (
+        // accumulator for the cloned fields; gets filled over time
+        $clone: ident {
+            $($clone_fields:tt)*
+        }
+        // field: value
+        $field:ident : $value:expr
+        // no rest left
+    ) => {
+        $clone {
+            // keep everything we already cloned
+            $($clone_fields)*
+            // clone the new field
+            // SAFETY: this will never be called
+            $field : unsafe { $crate::clone(&$value) },
+        }
+    };
+    // no fields
+    // TODO: support tuple and unit structs
+    ($clone: ident {}) => {
+        $clone {}
+    };
+}
 
 /// Fills a pointer with the given value without allocating memory (if possible).
 /// This does not drop the old value.
@@ -26,22 +156,20 @@ pub fn typecheck<T>(_: *mut T) {}
 macro_rules! fill_ptr {
     // [v; n]
     ($ptr: expr, [$v:expr; $n:expr]) => {{
-        let ptr = $ptr;
-        $crate::typecheck(ptr);
+        let boxify_ptr = $ptr;
+        $crate::typecheck(boxify_ptr);
 
-        $crate::fill_array(ptr, $v);
+        $crate::fill_array(boxify_ptr, $v);
     }};
     // Strct { ... }
-    ($ptr: expr, $ty:ident { $($fields:tt)* }) => {{
-        // This is never called, but causes a compiler error if
-        // not all fields are initialized
-        #[allow(unused)] {
-            || {
-                $ty {
-                    $($fields)*
-                }
-            };
+    (
+        $ptr: expr,
+        $ty:ident {
+            $($fields:tt)*
         }
+    ) => {{
+        // We don't need to assert that all fields are set because that's already done in `boxify`.
+        // $crate::clone_type!($ty { $($fields)* });
 
         $crate::init_fields!($ptr, $($fields)*);
     }};
@@ -49,10 +177,10 @@ macro_rules! fill_ptr {
 
     // catch-all
     ($ptr:expr, $value:expr) => {{
-        let ptr = $ptr;
-        $crate::typecheck(ptr);
+        let boxify_ptr = $ptr;
+        $crate::typecheck(boxify_ptr);
         // simplest version is just to write to the ptr
-        ptr.write($value);
+        boxify_ptr.write($value);
     }};
 }
 
@@ -108,21 +236,28 @@ macro_rules! boxify {
     };
     // Struct { ... }
     ($ty:ident { $($fields:tt)* }) => {{
-        let mut v = $crate::new_box_uninit_typed(|| $ty { $($fields)* });
-        let ptr = v.as_mut_ptr();
+        let mut boxify_final_value = $crate::new_box_uninit_typed($crate::clone_type!($ty { $($fields)* }));
+        let boxify_final_value_ptr = boxify_final_value.as_mut_ptr();
 
         #[allow(unused_unsafe)]
-        unsafe { $crate::fill_ptr!(ptr, $ty { $($fields)* }) };
+        unsafe { $crate::fill_ptr!(boxify_final_value_ptr, $ty { $($fields)* }) };
 
         // SAFETY: we just initialized the struct
-        unsafe { $crate::assume_init(v) }
+        unsafe { $crate::assume_init(boxify_final_value) }
     }};
 }
 
 #[macro_export]
 macro_rules! init_fields {
     // struct instantiation as a field value
-    ($ptr: expr, $field:ident : $ty:ident { $($fields:tt)* }, $($rest:tt)*) => {{
+    (
+        $ptr: expr,
+        // field: Struct { ... }
+        $field:ident : $ty:ident {
+            $($fields:tt)*
+        },
+        $($rest:tt)*
+    ) => {{
         // fill the field with the struct
         unsafe {
             $crate::fill_ptr!(core::ptr::addr_of_mut!((*$ptr).$field), $ty { $($fields)* });
@@ -131,7 +266,12 @@ macro_rules! init_fields {
         $crate::init_fields!($ptr, $($rest)*);
     }};
     // array as field value
-    ($ptr: expr, $field:ident : [$value:expr; $n:expr], $($rest:tt)*) => {
+    (
+        $ptr: expr,
+        // field: [value; COUNT]
+        $field:ident : [$value:expr; $n:expr],
+        $($rest:tt)*
+    ) => {
         // SAFETY: according to the `MaybeUninit` docs, this is safe
         unsafe {
             $crate::fill_ptr!(core::ptr::addr_of_mut!((*$ptr).$field), [$value; $n]);
@@ -140,7 +280,11 @@ macro_rules! init_fields {
         $crate::init_fields!($ptr, $($rest)*);
     };
     // any expression as field value
-    ($ptr: expr, $field:ident : $value:expr, $($rest:tt)*) => {
+    (
+        $ptr: expr,
+        $field:ident : $value:expr,
+        $($rest:tt)*
+    ) => {
         // SAFETY: according to the `MaybeUninit` docs, this is safe
         unsafe {
             $crate::fill_ptr!(core::ptr::addr_of_mut!((*$ptr).$field), $value);
@@ -148,10 +292,14 @@ macro_rules! init_fields {
 
         $crate::init_fields!($ptr, $($rest)*);
     };
-    ($ptr: expr, $field:ident : $value:expr) => {
+    // single field
+    (
+        $ptr: expr,
+        $field:ident : $value:expr
+    ) => {
         init_fields!($ptr, $field: $value,);
     };
-    // no more fields
+    // no fields
     ($ptr: expr,) => {};
 }
 
@@ -160,7 +308,7 @@ macro_rules! init_fields {
 ///
 /// This can be replaced with `Box::new_uninit` once it is stable.
 #[doc(hidden)]
-pub fn new_box_uninit_typed<T>(_: impl FnOnce() -> T) -> Box<MaybeUninit<T>> {
+pub fn new_box_uninit_typed<T>(_: TypeInferer<T>) -> Box<MaybeUninit<T>> {
     new_box_uninit::<T>()
 }
 
@@ -394,17 +542,47 @@ mod tests {
         assert_eq!(b.a.b[SIZE - 1], Foo { a: 1, b: 2 });
     }
 
+    // #[test]
+    // fn boxify_tuple() {
+    //     // actual tuple
+    //     let b = boxify!((1, 2));
+    //     assert_eq!(b.0, 1);
+    //     assert_eq!(b.1, 2);
+
+    //     // tuple struct
+    //     let b = boxify!(Some(1));
+    //     assert_eq!(b, Some(1));
+    // }
+
     #[test]
     fn boxify_complex_struct() {
         struct A<'a, T> {
             a: &'a [T; 100],
             b: &'a str,
+            c: [T; 10],
         }
 
         let a = &[42; 100];
         let b = "hello world";
-        let bx = boxify!(A { a: a, b: b }); // TODO: support short form `A { a, b }`
+        let bx = boxify!(A {
+            a: a,
+            b: b,
+            c: [21; 10]
+        }); // TODO: support short form `A { a, b }`
         assert_eq!(bx.a, a);
         assert_eq!(bx.b, b);
+    }
+
+    #[test]
+    fn boxify_local_variable() {
+        let a = alloc::vec![42; 100];
+        // let b = boxify!(a);
+        // assert_eq!(*b, 42);
+
+        struct Test {
+            a: alloc::vec::Vec<u32>,
+        }
+
+        boxify!(Test { a: a });
     }
 }
