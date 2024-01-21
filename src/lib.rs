@@ -33,13 +33,14 @@ macro_rules! fill_ptr {
     }};
     // Strct { ... }
     ($ptr: expr, $ty:ident { $($fields:tt)* }) => {{
-        /// This is never called, but causes a compiler error if
-        /// not all fields are initialized
-        #[allow(dead_code)]
-        fn all_fields_inited() -> $ty {
-            $ty {
-                $($fields)*
-            }
+        // This is never called, but causes a compiler error if
+        // not all fields are initialized
+        #[allow(unused)] {
+            || {
+                $ty {
+                    $($fields)*
+                }
+            };
         }
 
         $crate::init_fields!($ptr, $($fields)*);
@@ -57,7 +58,7 @@ macro_rules! fill_ptr {
 
 #[macro_export]
 macro_rules! boxify {
-    // zeroed memory impls
+    // [0; COUNT]
     ([0; $n:expr]) => {
         // Rust uses i32 for untyped integer literals
         unsafe { $crate::new_box_zeroed::<[i32; $n]>() }
@@ -101,9 +102,11 @@ macro_rules! boxify {
     ([false; $n:expr]) => {
         unsafe { $crate::new_box_zeroed::<[bool; $n]>() }
     };
+    // [value; COUNT] where TypeOf[value]: Copy
     ([$value:expr; $n:expr]) => {
         $crate::new_filled_boxed_array::<_, $n>($value)
     };
+    // Struct { ... }
     ($ty:ident { $($fields:tt)* }) => {{
         let mut v = $crate::new_box_uninit::<$ty>();
         let ptr = v.as_mut_ptr();
@@ -120,14 +123,6 @@ macro_rules! boxify {
 macro_rules! init_fields {
     // struct instantiation as a field value
     ($ptr: expr, $field:ident : $ty:ident { $($fields:tt)* }, $($rest:tt)*) => {{
-        /// This is never called, but causes a compiler error if
-        /// not all fields are initialized
-        #[allow(dead_code)]
-        fn all_fields_inited() -> $ty {
-            $ty {
-                $($fields)*
-            }
-        }
         // fill the field with the struct
         unsafe {
             $crate::fill_ptr!(core::ptr::addr_of_mut!((*$ptr).$field), $ty { $($fields)* });
@@ -170,7 +165,7 @@ pub fn new_box_uninit<T>() -> Box<MaybeUninit<T>> {
     } else {
         let layout = Layout::new::<MaybeUninit<T>>();
         // SAFETY: alloc is safe because we checked T for ZST and MaybeUninit<T> has the same layout as T
-        let ptr = unsafe { alloc(layout) as *mut MaybeUninit<T> };
+        let ptr = unsafe { alloc(layout) } as *mut MaybeUninit<T>;
         if ptr.is_null() {
             handle_alloc_error(layout);
         }
@@ -388,5 +383,19 @@ mod tests {
         });
         assert_eq!(b.a.a[SIZE - 1], 0);
         assert_eq!(b.a.b[SIZE - 1], Foo { a: 1, b: 2 });
+    }
+
+    #[test]
+    fn boxify_complex_struct() {
+        struct A<'a> {
+            a: &'a [u32; 100],
+            b: &'a str,
+        }
+
+        let a = &[42; 100];
+        let b = "hello world";
+        let bx = boxify!(A { a: a, b: b }); // TODO: support short form `A { a, b }`
+        assert_eq!(bx.a, a);
+        assert_eq!(bx.b, b);
     }
 }

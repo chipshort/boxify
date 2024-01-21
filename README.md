@@ -17,6 +17,30 @@ let e = boxify::boxify!(Example {
 
 ## Supported structures
 
-Currently, this supports structs and arrays. All other types are constructed on the stack and put into the box later.
+Currently, this supports structs and arrays, even deeply nested ones. Take a look at the `examples` folder to
+see what's possible.
+All other types are constructed on the stack and put into the box later.
 
 Support for enums is currently not there yet, but planned.
+
+## Known Limitations
+
+- Structs need to be imported in order to be instantiated, you cannot instantiate `module::Struct` without importing it:
+
+```rust
+use module::Struct;
+
+boxify::boxify!(Struct { a: 42 });
+// this does not work:
+// boxify::boxify!(module::Struct { a: 42 });
+```
+
+- Currently, you cannot use the short instantiation syntax:
+
+```rust
+boxify::boxify!(Struct { a: a });
+// this does not work:
+// boxify::boxify!(Struct { a });
+```
+
+- Enums are not supported (yet)
