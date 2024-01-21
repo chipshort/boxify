@@ -96,6 +96,20 @@ fn boxify_zst_array() {
 }
 
 #[test]
+fn boxify_struct_in_module() {
+    mod foo {
+        #[derive(Debug, PartialEq)]
+        pub struct Foo {
+            pub a: u32,
+            pub b: u32,
+        }
+    }
+    let b = boxify!(foo::Foo { a: 1, b: 2 });
+    assert_eq!(b.a, 1);
+    assert_eq!(b.b, 2);
+}
+
+#[test]
 fn boxify_struct() {
     #[derive(Debug, Clone, Copy, PartialEq)]
     struct Foo {
@@ -155,11 +169,7 @@ fn boxify_complex_struct() {
 
     let a = &[42; 100];
     let b = "hello world";
-    let bx = boxify!(A {
-        a: a,
-        b: b,
-        c: [21; 10]
-    }); // TODO: support short form `A { a, b }`
+    let bx = boxify!(A { a, b, c: [21; 10] }); // TODO: support short form `A { a, b }`
     assert_eq!(bx.a, a);
     assert_eq!(bx.b, b);
 }

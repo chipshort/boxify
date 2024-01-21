@@ -26,7 +26,13 @@ fn main() {
 
     value.as_mut().child.grand_child.huge_array[100] = 21;
     println!(
-        "value.child.grand_child.huge_array[100] = {}",
-        value.child.grand_child.huge_array[100]
+        "sum(value.child.grand_child.huge_array) = {}",
+        value
+            .child
+            .grand_child
+            .huge_array
+            .iter()
+            .map(|i| *i as u128)
+            .sum::<u128>()
     );
 }
