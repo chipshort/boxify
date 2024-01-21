@@ -17,10 +17,10 @@ let e = boxify::boxify!(Example {
 
 ## Supported structures
 
-Currently, this supports structs and arrays, even deeply nested ones. Take a look at the `examples` folder to
+Currently, this supports tuples, arrays and structs, even deeply nested ones. Take a look at the `examples` folder to
 see what's possible.
 All other types are constructed on the stack and put into the box later.
 
 ## Known Limitations
 
-- Enums are not supported (yet)
+- Enums are not supported

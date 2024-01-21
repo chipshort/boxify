@@ -171,7 +171,7 @@ fn boxify_complex_struct() {
 
     let a = &[42; 100];
     let b = "hello world";
-    let bx = boxify!(A { a, b, c: [21; 10] }); // TODO: support short form `A { a, b }`
+    let bx = boxify!(A { a, b, c: [21; 10] });
     assert_eq!(bx.a, a);
     assert_eq!(bx.b, b);
 }

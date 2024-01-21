@@ -129,9 +129,9 @@ fn validate_fields(mut expr: Expr) -> proc_macro2::TokenStream {
 /// potentially big structs.
 fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
     match value {
-        Expr::Array(_array) => {
-            todo!("array literals are currently not supported");
-        }
+        // Expr::Array(_array) => {
+        //     todo!("array literals are currently not supported");
+        // }
         Expr::Repeat(array) => fill_array(ptr, array),
         Expr::Struct(strct) => fill_struct_fields(ptr, strct),
         Expr::Tuple(tuple) => fill_tuple(ptr, &tuple.elems),
@@ -187,7 +187,7 @@ fn fill_tuple(
         let field_ptr = parse_quote! {
             core::ptr::addr_of_mut!((*#ptr).#index)
         };
-        fill_ptr(&field_ptr, &value)
+        fill_ptr(&field_ptr, value)
     });
     quote! {
         #(#instantiation_codes);*
