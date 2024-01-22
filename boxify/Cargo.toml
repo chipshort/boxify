@@ -1,8 +1,13 @@
 [package]
 name = "boxify"
+categories = ["memory-management", "no-std"]
+description = "Place your values directly on the heap without creating them on the stack first."
 version = "0.1.0"
 edition = "2021"
 authors = ["Christoph Otter <chipshort@protonmail.com>"]
+documentation = "https://docs.rs/boxify"
+license = "MIT"
+repository = "https://github.com/chipshort/boxify"
 
 [dependencies]
 boxify-macro = { path = "../boxify-macro" }
