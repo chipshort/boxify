@@ -101,7 +101,6 @@ pub unsafe fn new_box_zeroed<T>() -> Box<T> {
     unsafe { Box::from_raw(ptr.as_ptr() as *mut T) }
 }
 
-// TODO: use trait for specialization? (e.g. for `T: Clone` instead of `Copy`, we need to clone each time)
 /// Fills a boxed array with the given value.
 ///
 /// # Safety

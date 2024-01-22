@@ -3,10 +3,11 @@
 use std::str::FromStr;
 
 use litrs::{BoolLit, Literal};
-use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use proc_macro2::{Span, TokenStream};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{
-    parse_quote,
+    parse_quote, parse_quote_spanned,
+    spanned::Spanned,
     visit_mut::{self, VisitMut},
     Expr,
 };
@@ -41,13 +42,22 @@ fn boxify_impl(value_to_box: Expr) -> TokenStream {
     let final_value_ptr = parse_quote! {
         __boxify_final_value_ptr
     };
-    let instantiation_code = match value_to_box {
+    let instantiation_code = match &value_to_box {
         // listing them here explicitly in order to throw an error for any other type
         // since only these here are allocated directly on the heap right now
-        Expr::Struct(_) | Expr::Repeat(_) | Expr::Tuple(_) | Expr::Call(_) => {
+        Expr::Struct(_) | Expr::Repeat(_) | Expr::Tuple(_) => {
             fill_ptr(&final_value_ptr, &value_to_box)
         }
-        _ => todo!("Implement for more types"),
+        Expr::Call(call) => {
+            let validate_not_fn_call = validate_not_fn(&call.func);
+            let fill_code = fill_ptr(&final_value_ptr, &value_to_box);
+
+            quote! {{
+                #validate_not_fn_call
+                #fill_code
+            }}
+        }
+        _ => unimplemented!("Unsupported input type"),
     };
 
     quote! {{
@@ -93,25 +103,25 @@ fn zero_alloc_special_handling(value_to_box: &Expr) -> Option<TokenStream> {
     None
 }
 
+/// Outputs code that creates a value of the same type as its input
+/// without taking ownership of the input.
+struct CloneType;
+
+impl VisitMut for CloneType {
+    fn visit_field_value_mut(&mut self, v: &mut syn::FieldValue) {
+        let expr = &v.expr;
+        // Replace the expression with a clone of the expression.
+        v.expr = parse_quote! {
+            // SAFETY: we never execute this code,
+            // we just use it for type checking / inference
+            unsafe { ::boxify::clone(&#expr) }
+        };
+        visit_mut::visit_field_value_mut(self, v);
+    }
+}
+
 /// Generates code that validates that all fields of a struct were provided.
 fn validate_fields(mut expr: Expr) -> proc_macro2::TokenStream {
-    /// Outputs code that creates a value of the same type as its input
-    /// without taking ownership of the input.
-    struct CloneType;
-
-    impl VisitMut for CloneType {
-        fn visit_field_value_mut(&mut self, v: &mut syn::FieldValue) {
-            let expr = &v.expr;
-            // Replace the expression with a clone of the expression.
-            v.expr = parse_quote! {
-                // SAFETY: we never execute this code,
-                // we just use it for type checking / inference
-                unsafe { ::boxify::clone(&#expr) }
-            };
-            visit_mut::visit_field_value_mut(self, v);
-        }
-    }
-
     CloneType.visit_expr_mut(&mut expr);
 
     // Wrap this in a `TypeInferer` to prevent misuse
@@ -121,6 +131,28 @@ fn validate_fields(mut expr: Expr) -> proc_macro2::TokenStream {
             #expr
         })
     }
+}
+
+/// Validates that the given expression is not a function call of the form `function()`.
+///
+/// This is needed to distinguish between function calls and struct instantiations and
+/// cause a compile error for the former.
+fn validate_not_fn(expr: &Expr) -> TokenStream {
+    quote_spanned! {expr.span()=> {
+        // we want to distinguish between function calls and tuple struct instantiations
+        // the function call should cause a compile error
+
+        trait NotFn {
+            type Check;
+        }
+
+        impl NotFn for () {
+            // this is where the magic happens
+            // we use the fact that a tuple struct name is a valid type,
+            // but a function name is not
+            type Check = #expr;
+        }
+    }}
 }
 
 /// Fills a pointer with a value by matching on the value and choosing the
@@ -134,13 +166,13 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
         // }
         Expr::Repeat(array) => fill_array(ptr, array),
         Expr::Struct(strct) => fill_struct_fields(ptr, strct),
-        Expr::Tuple(tuple) => fill_tuple(ptr, &tuple.elems),
+        Expr::Tuple(tuple) => fill_tuple(ptr, tuple.span(), &tuple.elems),
         Expr::Call(call) => {
             if let Expr::Path(_) = &*call.func {
                 // TODO: we assume that we are given a struct for now
-                fill_tuple(ptr, &call.args)
+                fill_tuple(ptr, call.span(), &call.args)
             } else {
-                unimplemented!("function calls are not supported")
+                unimplemented!("Function calls are not supported")
             }
         }
         e => {
@@ -180,16 +212,17 @@ fn fill_array(ptr: &Expr, array: &syn::ExprRepeat) -> proc_macro2::TokenStream {
 /// Fills a tuple by filling all its elements.
 fn fill_tuple(
     ptr: &Expr,
+    span: Span,
     elems: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
 ) -> proc_macro2::TokenStream {
     let instantiation_codes = elems.iter().enumerate().map(|(index, value)| {
         let index = syn::Index::from(index);
-        let field_ptr = parse_quote! {
+        let field_ptr = parse_quote_spanned! {value.span()=>
             core::ptr::addr_of_mut!((*#ptr).#index)
         };
         fill_ptr(&field_ptr, value)
     });
-    quote! {
+    quote_spanned! {span=>
         #(#instantiation_codes);*
     }
 }
