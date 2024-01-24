@@ -1,3 +1,8 @@
 [workspace]
+package.version = "0.1.0"
 members = ["boxify", "boxify-macro", "boxify-tests"]
 resolver = "2"
+
+[workspace.dependencies]
+boxify = { version = "0.1.0", path = "boxify" }
+boxify-macro = { version = "0.1.0", path = "boxify-macro" }
