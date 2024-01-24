@@ -1,5 +1,6 @@
 //! Proc-macro crate for `boxify` crate.
-//! Please see [`::boxify`] for more information.
+//! Please see [`boxify`](../boxify) for more information.
+
 use std::str::FromStr;
 
 use litrs::{BoolLit, Literal};
