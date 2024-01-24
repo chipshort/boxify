@@ -48,3 +48,36 @@ fn function_call_empty() {}
 /// ```
 #[allow(dead_code)]
 fn function_call_param() {}
+
+/// ```compile_fail
+/// use boxify::boxify;
+///
+/// enum Foo {
+///    Bar,
+/// }
+/// let b = boxify!(Foo::Bar);
+/// ```
+#[allow(dead_code)]
+fn enum_() {}
+
+/// ```compile_fail
+/// use boxify::boxify;
+///
+/// enum Foo {
+///    Bar(u32),
+/// }
+/// let b = boxify!(Foo::Bar(0));
+/// ```
+#[allow(dead_code)]
+fn enum_data1() {}
+
+/// ```compile_fail
+/// use boxify::boxify;
+///
+/// enum Foo {
+///    Bar { a: u32 },
+/// }
+/// let b = boxify!(Foo::Bar { a: 42 });
+/// ```
+#[allow(dead_code)]
+fn enum_data2() {}
