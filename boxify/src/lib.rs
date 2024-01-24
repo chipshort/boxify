@@ -15,8 +15,10 @@ use core::{
 pub use boxify_macro::boxify;
 
 /// Never use this in code that is actually run!
-/// This is only here to make sure that the macro works.
 /// It creates a second owned value from a reference.
+///
+/// This crate only calls it in closures that are never called themselves.
+/// It is only needed to typecheck the macro input.
 ///
 /// # Safety
 /// This is NEVER safe to use.

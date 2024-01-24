@@ -23,4 +23,4 @@ All other types are constructed on the stack and put into the box later.
 
 ## Known Limitations
 
-- Enums are not supported
+- Enums are not supported and can never be fully supported since their layout in memory is not fully specified.

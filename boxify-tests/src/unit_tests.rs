@@ -9,7 +9,7 @@ const SIZE: usize = 10;
 const SIZE: usize = 10000000;
 
 #[test]
-#[ignore = "causes stack overflow"]
+#[ignore = "Box::new causes stack overflow"]
 fn size_too_big_for_stack() {
     let b = Box::new([0u8; SIZE]);
     assert_eq!(b[SIZE - 1], 0);
