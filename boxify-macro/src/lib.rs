@@ -10,7 +10,7 @@ use syn::{
     parse_quote, parse_quote_spanned,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Expr,
+    Expr, Token,
 };
 
 extern crate proc_macro;
@@ -110,6 +110,11 @@ struct CloneType;
 
 impl VisitMut for CloneType {
     fn visit_field_value_mut(&mut self, v: &mut syn::FieldValue) {
+        if v.colon_token.is_none() {
+            // need to set the colon token here, otherwise syn will not generate the expression
+            v.colon_token = Some(Token![:](v.span()));
+        }
+
         let expr = &v.expr;
         // Replace the expression with a clone of the expression.
         v.expr = parse_quote! {
@@ -230,6 +235,8 @@ fn fill_tuple(
 
 #[cfg(test)]
 mod tests {
+    use syn::ExprStruct;
+
     use super::*;
 
     #[test]
@@ -247,7 +254,7 @@ mod tests {
         };
         let tokens = validate_fields(expr);
 
-        let expected = quote! {
+        let expected: TokenStream = quote! {
             ::boxify::TypeInferer::new(|| {
                 Parent {
                     child: unsafe { ::boxify::clone(&Child {
@@ -261,5 +268,27 @@ mod tests {
             })
         };
         assert_eq!(tokens.to_string(), expected.to_string());
+    }
+
+    #[test]
+    fn boxify_short_form() {
+        let mut a: ExprStruct = parse_quote!(Foo { a });
+        let mut b: ExprStruct = parse_quote!(Foo { a: a });
+
+        let expected: ExprStruct = parse_quote!(Foo {
+            a: unsafe { ::boxify::clone(&a) }
+        });
+
+        CloneType.visit_expr_struct_mut(&mut a);
+        CloneType.visit_expr_struct_mut(&mut b);
+
+        assert_eq!(
+            a.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
+        assert_eq!(
+            b.to_token_stream().to_string(),
+            expected.to_token_stream().to_string()
+        );
     }
 }

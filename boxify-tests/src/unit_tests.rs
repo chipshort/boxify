@@ -188,3 +188,15 @@ fn boxify_local_variable() {
 
     boxify!(Test { a: a });
 }
+
+#[test]
+fn boxify_outer_var() {
+    struct NotCopy(u32);
+    struct Foo {
+        a: NotCopy,
+    }
+    let a = NotCopy(42);
+
+    let b = boxify!(Foo { a });
+    assert_eq!(b.a.0, 42);
+}
