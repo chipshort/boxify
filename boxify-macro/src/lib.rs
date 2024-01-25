@@ -176,7 +176,7 @@ fn validate_not_tuple_struct(path: &Path) -> TokenStream {
         #[allow(unused)] {
                 #[allow(unused)]
                 use #path;
-                #[allow(unused)]
+                #[allow(unused, clippy::let_unit_value)]
                 let #ident = ();
         };
     }}
