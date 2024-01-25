@@ -10,7 +10,7 @@ use syn::{
     parse_quote, parse_quote_spanned,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Expr, ExprCall, Token,
+    Expr, ExprCall, ExprPath, Path, Token,
 };
 
 use crate::expr_helpers::ExprCallExt;
@@ -50,17 +50,8 @@ fn boxify_impl(value_to_box: Expr) -> TokenStream {
     let instantiation_code = match &value_to_box {
         // listing them here explicitly in order to throw an error for any other type
         // since only these here are allocated directly on the heap right now
-        Expr::Struct(_) | Expr::Repeat(_) | Expr::Tuple(_) => {
+        Expr::Struct(_) | Expr::Repeat(_) | Expr::Tuple(_) | Expr::Call(_) => {
             fill_ptr(&final_value_ptr, &value_to_box)
-        }
-        Expr::Call(call) => {
-            let validate_not_fn_call = validate_not_fn(call);
-            let fill_code = fill_ptr(&final_value_ptr, &value_to_box);
-
-            quote! {{
-                #validate_not_fn_call
-                #fill_code
-            }}
         }
         _ => unimplemented!("Unsupported input type"),
     };
@@ -143,7 +134,7 @@ fn validate_fields(mut expr: Expr) -> proc_macro2::TokenStream {
     }
 }
 
-/// Validates that the given expression is not a function call of the form `function()`.
+/// Validates that the given expression is not a function call of the form `function(...)`.
 ///
 /// This is needed to distinguish between function calls and struct instantiations and
 /// cause a compile error for the former.
@@ -170,6 +161,27 @@ fn validate_not_fn(expr: &ExprCall) -> TokenStream {
     }}
 }
 
+/// Validates that the given expression is not a tuple struct instantiation of the form `Struct(...)`.
+///
+/// This is needed to distinguish between function calls and struct instantiations and
+/// cause a compile error for the latter.
+fn validate_not_tuple_struct(path: &Path) -> TokenStream {
+    // The only way to reject a tuple struct instantiation, but accept a function call that I found is
+    // to shadow the name with a let-binding. For tuple structs, this causes a compiler error,
+    // but not for function calls.
+    // I am not sure how "future-proof" this is, but I don't know a better way.
+    let ident = path.get_ident().unwrap();
+
+    quote_spanned! {path.span()=> {
+        #[allow(unused)] {
+                #[allow(unused)]
+                use #path;
+                #[allow(unused)]
+                let #ident = ();
+        };
+    }}
+}
+
 /// Fills a pointer with a value by matching on the value and choosing the
 /// appropriate method to fill the pointer.
 /// This is needed to be able to introduce special-handling for arrays and
@@ -183,14 +195,29 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
         Expr::Struct(strct) => fill_struct_fields(ptr, strct),
         Expr::Tuple(tuple) => fill_tuple(ptr, tuple.span(), &tuple.elems),
         Expr::Call(call) => {
-            if let Expr::Path(_) = &*call.func {
-                let validate_not_fn_call = validate_not_fn(call);
-                let fill_code = fill_tuple(ptr, call.span(), &call.args);
+            if let Expr::Path(ExprPath { path, .. }) = &*call.func {
+                let ident = path.get_ident().expect("empty path not supported");
+                let first_char = ident.to_string().chars().next().unwrap();
+                if first_char.is_uppercase() {
+                    // we assume it's a struct instantiation
+                    // but we need to make sure it's not a function call (otherwise we'd generate invalid code)
+                    let validate_not_fn_call = validate_not_fn(call);
+                    let fill_code = fill_tuple(ptr, call.span(), &call.args);
 
-                quote! {{
-                    #validate_not_fn_call
-                    #fill_code
-                }}
+                    quote! {{
+                        #validate_not_fn_call
+                        #fill_code
+                    }}
+                } else {
+                    // assume it's a function call
+                    // but make sure it's not a struct instantiation (otherwise our code could overflow the stack)
+                    let validate_not_struct = validate_not_tuple_struct(path);
+
+                    quote! {
+                        #validate_not_struct
+                        unsafe { #ptr.write(#value); }
+                    }
+                }
             } else {
                 unimplemented!("Function calls are not supported")
             }

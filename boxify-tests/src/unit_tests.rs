@@ -162,6 +162,37 @@ fn boxify_tuple() {
 }
 
 #[test]
+fn boxify_fn_call() {
+    fn test() -> [u32; 100] {
+        [42; 100]
+    }
+    // nested
+    struct A {
+        a: [u32; 100],
+    }
+    let b = boxify!(A { a: test() });
+    assert_eq!(b.a[0], 42);
+
+    // top level
+    let b = boxify!(test());
+    assert_eq!(b[0], 42);
+
+    // parameter
+    fn test2(v: i32) -> [i32; 100] {
+        [v; 100]
+    }
+    let b = boxify!(test2(42));
+    assert_eq!(b[0], 42);
+
+    // generic
+    fn test_generic<T: Copy>(v: T) -> [T; 100] {
+        [v; 100]
+    }
+    let b = boxify!(test_generic(21));
+    assert_eq!(b[0], 21);
+}
+
+#[test]
 fn boxify_complex_struct() {
     struct A<'a, T> {
         a: &'a [T; 100],

@@ -24,7 +24,7 @@ fn incorrect_input_type() {}
 /// ```compile_fail
 /// use boxify::boxify;
 ///
-/// let b = boxify!((|| 42)());
+/// let b = boxify!((|| 42)()); // TODO: this should also work
 /// ```
 #[allow(dead_code)]
 fn function_call() {}
@@ -32,54 +32,24 @@ fn function_call() {}
 /// ```compile_fail
 /// use boxify::boxify;
 ///
-/// fn test() -> [i32; 100] {
-///    [42; 100]
-/// }
-/// let b = boxify!(test());
-/// ```
-#[allow(dead_code)]
-fn function_call_empty() {}
-
-/// ```compile_fail
-/// use boxify::boxify;
+/// #[allow(non_camel_case_types)]
+/// struct test(u32);
 ///
-/// fn test() -> [u32; 100] {
-///     [42; 100]
-/// }
-/// struct A {
-///     a: [u32; 100],
-/// }
-///
-/// struct IsNotFn<T>(core::marker::PhantomData<T>);
-///
-/// // TODO: this should call the function instead of failing
-/// // Problem: How to detect if it's a function call or a tuple struct?
-/// let _ = boxify!(A { a: test() });
-/// ```
-#[allow(dead_code)]
-fn function_call_inside() {}
-
-/// ```compile_fail
-/// use boxify::boxify;
-///
-/// fn test(v: i32) -> [i32; 100] {
-///    [v; 100]
-/// }
 /// let b = boxify!(test(42));
 /// ```
 #[allow(dead_code)]
-fn function_call_param() {}
+fn lower_case_tuple_struct() {}
 
 /// ```compile_fail
 /// use boxify::boxify;
 ///
-/// fn test<T>(v: T) -> [i32; 100] {
-///   [42; 100]
-/// }
-/// let b = boxify!(test(42));
+/// struct A(u32);
+/// fn Test(_: u32) -> A { A(42) }
 ///
+/// let b = boxify!(Test(42));
+/// ```
 #[allow(dead_code)]
-fn function_call_generics() {}
+fn upper_case_fn_call() {}
 
 /// ```compile_fail
 /// use boxify::boxify;
