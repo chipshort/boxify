@@ -177,6 +177,15 @@ fn boxify_complex_struct() {
 }
 
 #[test]
+fn boxify_generic_tuple_struct() {
+    struct A<'a, T>(&'a [T; 100]);
+
+    let a = &[42; 100];
+    let bx = boxify!(A(a));
+    assert_eq!(bx.0, a);
+}
+
+#[test]
 fn boxify_local_variable() {
     let a = vec![42; 100];
     // let b = boxify!(a);
@@ -187,6 +196,46 @@ fn boxify_local_variable() {
     }
 
     boxify!(Test { a: a });
+}
+
+#[test]
+fn boxify_different_reprs() {
+    #[repr(C)]
+    struct FooC {
+        a: u8,
+        b: u32,
+    }
+    #[repr(packed)]
+    struct FooP {
+        a: u8,
+        b: Box<u32>,
+    }
+
+    struct NotCopy<T>(T);
+
+    #[repr(C, packed)]
+    struct FooP2 {
+        a: NotCopy<u16>,
+        b: NotCopy<[u32; 5]>,
+    }
+
+    let b = boxify!(FooC { a: 1, b: 2 });
+    assert_eq!(b.a, 1);
+    assert_eq!(b.b, 2);
+
+    let bx = Box::new(42);
+    let b = boxify!(FooP { a: 1, b: bx });
+    assert_eq!(b.a, 1);
+    assert_eq!(*b.b, 42);
+
+    let b = boxify!(FooP2 {
+        a: NotCopy(1u16),
+        b: NotCopy([42; 5]),
+    });
+    let a = b.a;
+    assert_eq!(a.0, 1);
+    let b = unsafe { core::ptr::read_unaligned(core::ptr::addr_of!(b.b)) };
+    assert_eq!(b.0, [42; 5]); // TODO: unaligned
 }
 
 #[test]

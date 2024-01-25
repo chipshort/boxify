@@ -3,7 +3,7 @@
 This crate provides a macro to initialize your `Box<T>` on the heap without having to have it on the stack before.
 This allows easily putting big arrays or structs containing them into a `Box` without overflowing the stack:
 
-```rust
+```rust ,ignore
 // this would overflow the stack:
 // let e = Box::new(Example {
 //     huge_array: [42; 1024 * 1024 * 1024],
@@ -24,3 +24,5 @@ All other types are constructed on the stack and put into the box later.
 ## Known Limitations
 
 - Enums are not supported and can never be fully supported since their layout in memory is not fully specified.
+- Function calls inside the instantiation are currently not supported because they cannot be differentiated from tuple struct instantiations. Just save them to local
+variables for now and use those.

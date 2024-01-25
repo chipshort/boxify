@@ -10,10 +10,14 @@ use syn::{
     parse_quote, parse_quote_spanned,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Expr, Token,
+    Expr, ExprCall, Token,
 };
 
+use crate::expr_helpers::ExprCallExt;
+
 extern crate proc_macro;
+
+mod expr_helpers;
 
 /// Places the given value on the heap, like [`Box::new`], but without creating it on the stack first.
 /// This is useful for values that are too big to be created on the stack.
@@ -50,7 +54,7 @@ fn boxify_impl(value_to_box: Expr) -> TokenStream {
             fill_ptr(&final_value_ptr, &value_to_box)
         }
         Expr::Call(call) => {
-            let validate_not_fn_call = validate_not_fn(&call.func);
+            let validate_not_fn_call = validate_not_fn(call);
             let fill_code = fill_ptr(&final_value_ptr, &value_to_box);
 
             quote! {{
@@ -143,21 +147,26 @@ fn validate_fields(mut expr: Expr) -> proc_macro2::TokenStream {
 ///
 /// This is needed to distinguish between function calls and struct instantiations and
 /// cause a compile error for the former.
-fn validate_not_fn(expr: &Expr) -> TokenStream {
+fn validate_not_fn(expr: &ExprCall) -> TokenStream {
+    // clone the call params to avoid capturing outside variables
+    let mut clone = expr.clone();
+    CloneType.visit_expr_call_mut(&mut clone);
+
+    // create a match pattern that matches the given call expression
+    // example: `Tuple(a, b, c)` -> `Tuple(_, _, _)`
+    // this will cause a compiler error if the expression is a function call,
+    // since function calls cannot be match patterns (and that's exactly what we want)
+    let mut match_expr = expr.clone();
+    match_expr.replace_params(parse_quote! { _ });
+
     quote_spanned! {expr.span()=> {
-        // we want to distinguish between function calls and tuple struct instantiations
-        // the function call should cause a compile error
-
-        trait NotFn {
-            type Check;
-        }
-
-        impl NotFn for () {
-            // this is where the magic happens
-            // we use the fact that a tuple struct name is a valid type,
-            // but a function name is not
-            type Check = #expr;
-        }
+        ::boxify::TypeInferer::new(||
+        {
+            // tuple structs can be matched
+            match #clone {
+                #match_expr => {}
+            }
+        });
     }}
 }
 
@@ -175,8 +184,13 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
         Expr::Tuple(tuple) => fill_tuple(ptr, tuple.span(), &tuple.elems),
         Expr::Call(call) => {
             if let Expr::Path(_) = &*call.func {
-                // TODO: we assume that we are given a struct for now
-                fill_tuple(ptr, call.span(), &call.args)
+                let validate_not_fn_call = validate_not_fn(call);
+                let fill_code = fill_tuple(ptr, call.span(), &call.args);
+
+                quote! {{
+                    #validate_not_fn_call
+                    #fill_code
+                }}
             } else {
                 unimplemented!("Function calls are not supported")
             }

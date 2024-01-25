@@ -31,6 +31,7 @@ fn function_call() {}
 
 /// ```compile_fail
 /// use boxify::boxify;
+///
 /// fn test() -> [i32; 100] {
 ///    [42; 100]
 /// }
@@ -41,6 +42,26 @@ fn function_call_empty() {}
 
 /// ```compile_fail
 /// use boxify::boxify;
+///
+/// fn test() -> [u32; 100] {
+///     [42; 100]
+/// }
+/// struct A {
+///     a: [u32; 100],
+/// }
+///
+/// struct IsNotFn<T>(core::marker::PhantomData<T>);
+///
+/// // TODO: this should call the function instead of failing
+/// // Problem: How to detect if it's a function call or a tuple struct?
+/// let _ = boxify!(A { a: test() });
+/// ```
+#[allow(dead_code)]
+fn function_call_inside() {}
+
+/// ```compile_fail
+/// use boxify::boxify;
+///
 /// fn test(v: i32) -> [i32; 100] {
 ///    [v; 100]
 /// }
@@ -48,6 +69,17 @@ fn function_call_empty() {}
 /// ```
 #[allow(dead_code)]
 fn function_call_param() {}
+
+/// ```compile_fail
+/// use boxify::boxify;
+///
+/// fn test<T>(v: T) -> [i32; 100] {
+///   [42; 100]
+/// }
+/// let b = boxify!(test(42));
+///
+#[allow(dead_code)]
+fn function_call_generics() {}
 
 /// ```compile_fail
 /// use boxify::boxify;
