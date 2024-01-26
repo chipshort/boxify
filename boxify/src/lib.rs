@@ -117,13 +117,15 @@ pub unsafe fn fill_array<T: Copy, const SIZE: usize>(array: *mut [T; SIZE], valu
 
     if size_of::<T>() == 1 {
         // in this case, we can use `ptr::write_bytes` instead of `ptr::write`
-        // SAFETY: we just checked that T is 1 byte, so transmuting to u8 is safe
-        let value_byte = core::ptr::addr_of!(value) as *const u8;
-        core::ptr::write_bytes(array, *value_byte, SIZE);
+        // SAFETY: we just checked that T is 1 byte, so casting to *const u8 is valid
+        let value_byte: *const u8 = core::ptr::addr_of!(value) as *const u8;
+        // also casting array to *mut u8 for alignment reasons
+        core::ptr::write_bytes(array as *mut u8, *value_byte, SIZE);
     } else {
         for i in 0..SIZE {
             // write the value to the array
-            array.add(i).write(value);
+            // array.add(i).write(value);
+            array.add(i).write_unaligned(value);
         }
     }
 }

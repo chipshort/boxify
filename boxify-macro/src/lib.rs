@@ -215,7 +215,8 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
 
                     quote! {
                         #validate_not_struct
-                        unsafe { #ptr.write(#value); }
+                        // unsafe { #ptr.write(#value); }
+                        unsafe { #ptr.write_unaligned(#value); }
                     }
                 }
             } else {
@@ -226,7 +227,8 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
             // fallback to creating the value on the stack and writing it to
             // the pointer from there
             quote! {
-                unsafe { #ptr.write(#e); }
+                // unsafe { #ptr.write(#e); }
+                unsafe { #ptr.write_unaligned(#e); }
             }
         }
     }
@@ -239,7 +241,7 @@ fn fill_struct_fields(strct_ptr: &Expr, strct: &syn::ExprStruct) -> proc_macro2:
         let expr = &field.expr;
 
         let field_ptr = parse_quote! {
-            core::ptr::addr_of_mut!((*#strct_ptr).#ident)
+            ::core::ptr::addr_of_mut!((*#strct_ptr).#ident)
         };
         fill_ptr(&field_ptr, expr)
     });
@@ -265,7 +267,7 @@ fn fill_tuple(
     let instantiation_codes = elems.iter().enumerate().map(|(index, value)| {
         let index = syn::Index::from(index);
         let field_ptr = parse_quote_spanned! {value.span()=>
-            core::ptr::addr_of_mut!((*#ptr).#index)
+            ::core::ptr::addr_of_mut!((*#ptr).#index)
         };
         fill_ptr(&field_ptr, value)
     });
