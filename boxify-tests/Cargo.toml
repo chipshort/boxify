@@ -8,3 +8,10 @@ publish = false
 
 [dependencies]
 boxify = { path = "../boxify" }
+
+[dev-dependencies]
+criterion = { version = "0.4", features = ["html_reports"] }
+
+[[bench]]
+name = "unaligned_aligned"
+harness = false
