@@ -11,7 +11,7 @@ env:
   RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  build:
+  build_and_test:
     name: Rust build and test
     runs-on: ubuntu-latest
 
@@ -23,3 +23,16 @@ jobs:
       run: cargo test --verbose
     - name: Run Clippy
       run: cargo clippy --all-targets --all-features
+
+  miri:
+    name: "Miri"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Miri
+        run: |
+          rustup toolchain install nightly --component miri
+          rustup override set nightly
+          cargo miri setup
+      - name: Test with Miri
+        run: cargo miri test
