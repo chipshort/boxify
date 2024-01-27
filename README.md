@@ -24,5 +24,6 @@ All other types are constructed on the stack and put into the box later.
 ## Known Limitations
 
 - Enums are not supported and can never be fully supported since their layout in memory is not fully specified.
-- Function calls inside the instantiation are currently not supported because they cannot be differentiated from tuple struct instantiations. Just save them to local
-variables for now and use those.
+- Only calls of lowercase function names and uppercase tuple struct instantiations are supported.  
+  This limitation is necessary because there is no way to determine whether something is a function call or a tuple struct instantiation and both have to be handled differently, so we just take a guess.
+  The macro will cause a compiler error if it encounters a struct where a function was expected and vice versa.
