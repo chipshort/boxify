@@ -83,3 +83,21 @@ fn enum_data1() {}
 /// ```
 #[allow(dead_code)]
 fn enum_data2() {}
+
+/// ```compile_fail
+/// use boxify::boxify;
+///
+/// struct A {
+///     a: u32,
+///     b: u32,
+/// }
+///
+/// let b = boxify!(A {
+///     a: 1,
+///     ..A {
+///         b: 2,
+///         ..A { a: 3, b: 4 }
+///     }
+/// });
+#[allow(dead_code)]
+fn struct_update_syntax() {}

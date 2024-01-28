@@ -123,6 +123,13 @@ impl VisitMut for CloneType {
 
 /// Generates code that validates that all fields of a struct were provided.
 fn validate_fields(mut expr: Expr) -> proc_macro2::TokenStream {
+    if let Expr::Struct(strct) = &mut expr {
+        if let Some(dotdot) = strct.dot2_token {
+            return syn::Error::new(dotdot.span(), "Struct update syntax is not supported")
+                .into_compile_error();
+        }
+    }
+
     CloneType.visit_expr_mut(&mut expr);
 
     // Wrap this in a `TypeInferer` to prevent misuse
