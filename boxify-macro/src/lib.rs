@@ -10,7 +10,7 @@ use syn::{
     parse_quote, parse_quote_spanned,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Expr, ExprCall, ExprPath, Path, Token,
+    Expr, ExprCall, ExprPath, ExprStruct, Path, Token,
 };
 
 use crate::expr_helpers::ExprCallExt;
@@ -123,11 +123,13 @@ impl VisitMut for CloneType {
 
 /// Generates code that validates that all fields of a struct were provided.
 fn validate_fields(mut expr: Expr) -> proc_macro2::TokenStream {
-    if let Expr::Struct(strct) = &mut expr {
-        if let Some(dotdot) = strct.dot2_token {
-            return syn::Error::new(dotdot.span(), "Struct update syntax is not supported")
-                .into_compile_error();
-        }
+    if let Expr::Struct(ExprStruct {
+        dot2_token: Some(dotdot),
+        ..
+    }) = &mut expr
+    {
+        return syn::Error::new(dotdot.span(), "Struct update syntax is not supported")
+            .into_compile_error();
     }
 
     CloneType.visit_expr_mut(&mut expr);
