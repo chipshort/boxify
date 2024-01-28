@@ -280,3 +280,22 @@ fn boxify_outer_var() {
     let b = boxify!(Foo { a });
     assert_eq!(b.a.0, 42);
 }
+
+#[test]
+fn boxify_spread_syntax() {
+    struct A {
+        a: u32,
+        b: u32,
+    }
+
+    let b = boxify!(A {
+        a: 1,
+        ..A {
+            b: 2,
+            ..A { a: 3, b: 4 }
+        }
+    });
+
+    assert_eq!(b.a, 1);
+    assert_eq!(b.b, 2); // FIXME: uninitialized memory
+}
