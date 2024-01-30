@@ -50,7 +50,7 @@ fn boxify_impl(value_to_box: Expr) -> TokenStream {
     let instantiation_code = match &value_to_box {
         // listing them here explicitly in order to throw an error for any other type
         // since only these here are allocated directly on the heap right now
-        Expr::Struct(_) | Expr::Repeat(_) | Expr::Tuple(_) | Expr::Call(_) => {
+        Expr::Struct(_) | Expr::Repeat(_) | Expr::Tuple(_) | Expr::Call(_) | Expr::Path(_) => {
             fill_ptr(&final_value_ptr, &value_to_box)
         }
         _ => unimplemented!("Unsupported input type"),
@@ -179,7 +179,7 @@ fn validate_not_tuple_struct(path: &Path) -> TokenStream {
     // to shadow the name with a let-binding. For tuple structs, this causes a compiler error,
     // but not for function calls.
     // I am not sure how "future-proof" this is, but I don't know a better way.
-    let ident = path.get_ident().unwrap();
+    let ident = path.segments.last().expect("empty ident not supported");
 
     quote_spanned! {path.span()=> {
         #[allow(unused)] {
@@ -205,8 +205,13 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
         Expr::Tuple(tuple) => fill_tuple(ptr, tuple.span(), &tuple.elems),
         Expr::Call(call) => {
             if let Expr::Path(ExprPath { path, .. }) = &*call.func {
-                let ident = path.get_ident().expect("empty path not supported");
-                let first_char = ident.to_string().chars().next().unwrap();
+                let ident = path.segments.last().expect("empty path not supported");
+                let first_char = ident
+                    .ident
+                    .to_string()
+                    .chars()
+                    .next()
+                    .expect("empty ident not supported");
                 if first_char.is_uppercase() {
                     // we assume it's a struct instantiation
                     // but we need to make sure it's not a function call (otherwise we'd generate invalid code)
@@ -342,5 +347,23 @@ mod tests {
             b.to_token_stream().to_string(),
             expected.to_token_stream().to_string()
         );
+    }
+
+    #[test]
+    fn trait_fn_call() {
+        let e: Expr = parse_quote!(La {
+            ma: -42i128,
+            na: E {
+                f: &[42u64; 10],
+                g: -42i32,
+                h: false,
+                i: &[42u64; 10],
+                j: String::from("a string"),
+                __phantom: ::core::marker::PhantomData::<&()>
+            },
+            __phantom: ::core::marker::PhantomData::<&()>
+        });
+
+        boxify_impl(e);
     }
 }
