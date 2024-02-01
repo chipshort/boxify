@@ -10,7 +10,7 @@ use syn::{
     parse_quote, parse_quote_spanned,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Expr, ExprCall, ExprPath, ExprStruct, Path, Token,
+    Expr, ExprCall, ExprPath, ExprStruct, Token,
 };
 
 use crate::expr_helpers::ExprCallExt;
@@ -170,27 +170,6 @@ fn validate_not_fn(expr: &ExprCall) -> TokenStream {
     }}
 }
 
-/// Validates that the given expression is not a tuple struct instantiation of the form `Struct(...)`.
-///
-/// This is needed to distinguish between function calls and struct instantiations and
-/// cause a compile error for the latter.
-fn validate_not_tuple_struct(path: &Path) -> TokenStream {
-    // The only way to reject a tuple struct instantiation, but accept a function call that I found is
-    // to shadow the name with a let-binding. For tuple structs, this causes a compiler error,
-    // but not for function calls.
-    // I am not sure how "future-proof" this is, but I don't know a better way.
-    let ident = path.segments.last().expect("empty ident not supported");
-
-    quote_spanned! {path.span()=> {
-        #[allow(unused)] {
-                #[allow(unused)]
-                use #path;
-                #[allow(unused, clippy::let_unit_value)]
-                let #ident = ();
-        };
-    }}
-}
-
 /// Fills a pointer with a value by matching on the value and choosing the
 /// appropriate method to fill the pointer.
 /// This is needed to be able to introduce special-handling for arrays and
@@ -224,11 +203,10 @@ fn fill_ptr(ptr: &Expr, value: &Expr) -> proc_macro2::TokenStream {
                     }}
                 } else {
                     // assume it's a function call
-                    // but make sure it's not a struct instantiation (otherwise our code could overflow the stack)
-                    let validate_not_struct = validate_not_tuple_struct(path);
+                    // there is currently no way to know for sure, but the worst that can happen here is that we
+                    // allocate the contents of a tuple struct on the stack. Not ideal, but not UB.
 
                     quote! {
-                        #validate_not_struct
                         // unsafe { #ptr.write(#value); }
                         unsafe { #ptr.write_unaligned(#value); }
                     }

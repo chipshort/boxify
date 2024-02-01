@@ -32,17 +32,6 @@ fn function_call() {}
 /// ```compile_fail
 /// use boxify::boxify;
 ///
-/// #[allow(non_camel_case_types)]
-/// struct test(u32);
-///
-/// let b = boxify!(test(42));
-/// ```
-#[allow(dead_code)]
-fn lower_case_tuple_struct() {}
-
-/// ```compile_fail
-/// use boxify::boxify;
-///
 /// struct A(u32);
 /// fn Test(_: u32) -> A { A(42) }
 ///
@@ -50,17 +39,6 @@ fn lower_case_tuple_struct() {}
 /// ```
 #[allow(dead_code)]
 fn upper_case_fn_call() {}
-
-/// ```compile_fail
-/// use boxify::boxify;
-///
-/// enum Foo {
-///    Bar,
-/// }
-/// let b = boxify!(Foo::Bar);
-/// ```
-#[allow(dead_code)]
-fn enum_() {}
 
 /// ```compile_fail
 /// use boxify::boxify;

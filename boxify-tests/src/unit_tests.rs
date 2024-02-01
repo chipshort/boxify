@@ -280,3 +280,33 @@ fn boxify_outer_var() {
     let b = boxify!(Foo { a });
     assert_eq!(b.a.0, 42);
 }
+
+#[test]
+fn boxify_unit_enum() {
+    #[derive(Debug, PartialEq)]
+    enum Foo {
+        #[allow(unused)]
+        Bar,
+        Baz,
+    }
+    let b = boxify!(Foo::Baz);
+    assert_eq!(b.as_ref(), &Foo::Baz);
+}
+
+#[test]
+fn boxify_lower_case_tuple_struct() {
+    #[allow(non_camel_case_types)]
+    struct test(u32);
+
+    // WARNING: Because of inherent macro limitations, this allocates on the stack before moving it to the heap.
+    let b = boxify!(test(42));
+    assert_eq!(42, b.0);
+}
+
+#[test]
+fn boxify_with_associated_method() {
+    struct Foo(String);
+
+    let b = boxify!(Foo(String::from("hello")));
+    assert_eq!(b.0, "hello");
+}
