@@ -24,6 +24,9 @@ All other types are constructed on the stack and put into the box later.
 ## Known Limitations
 
 - Enums are not supported and can never be fully supported since their layout in memory is not fully specified.
-- Only calls of lowercase function names and uppercase tuple struct instantiations are supported.  
-  This limitation is necessary because there is no way to determine whether something is a function call or a tuple struct instantiation and both have to be handled differently, so we just take a guess.
-  The macro will cause a compiler error if it encounters a struct where a function was expected and vice versa.
+- Only calls of _lowercase_ function names and _uppercase_ tuple struct instantiations are fully supported.  
+  This limitation is necessary because there is no way to determine whether something is a function call or a tuple struct instantiation and both have to be handled differently, so this crate just uses the naming as a heuristic.
+  The macro will cause a compiler error if it encounters a function where a struct was expected to prevent unsoundness.
+  A lowercase tuple struct instantiation will quietly allocate on the stack and move it to the heap.
+- Struct update syntax, aka `Test { ..test }` is not allowed and causes a compiler error.
+  This is because the macro needs to know all of the struct fields to fill them.
