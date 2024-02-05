@@ -137,6 +137,8 @@ pub unsafe fn fill_array<T: Copy, const SIZE: usize>(array: *mut [T; SIZE], valu
 #[doc(hidden)]
 pub unsafe fn assume_init<T>(b: Box<MaybeUninit<T>>) -> Box<T> {
     // SAFETY: MaybeUninit<T> guarantees the same layout as T
+    // and Box guarantees that it is just represented as a single pointer
+    // https://doc.rust-lang.org/std/boxed/index.html#memory-layout
     transmute(b)
     // maybe this would be better?
     // Box::from_raw((*Box::into_raw(b)).as_mut_ptr())
