@@ -1,8 +1,11 @@
 [package]
 name = "boxify-macro"
+categories = ["memory-management", "no-std"]
+description = "proc-macro for the boxify crate"
 version = { workspace = true }
 edition = "2021"
 authors = ["Christoph Otter <chipshort@protonmail.com>"]
+license = "MIT"
 repository = "https://github.com/chipshort/boxify"
 
 [lib]
